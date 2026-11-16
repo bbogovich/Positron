@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
+  <title>PositronApp</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 15px -apple-system, system-ui, sans-serif; margin: 2rem; }
+    h1 { font-size: 1.3rem; }
+    input, button { font: inherit; padding: 0.4rem 0.6rem; }
+    #out { margin-top: 1rem; padding: 0.75rem; border: 1px solid #8884; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>PositronApp</h1>
+  <p>
+    <input id="name" value="world" aria-label="name" />
+    <button id="greet">Greet</button>
+  </p>
+  <div id="out">Result will appear here.</div>
+
+  <script>
+    const out = document.getElementById("out");
+    document.getElementById("greet").addEventListener("click", async () => {
+      try {
+        const name = document.getElementById("name").value;
+        const res = await window.positron.invoke("greet", { name });
+        out.textContent = res.message;
+      } catch (e) {
+        out.textContent = "error: " + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

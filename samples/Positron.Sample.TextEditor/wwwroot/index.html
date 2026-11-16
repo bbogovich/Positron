@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Positron Text Editor</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { font: 14px -apple-system, system-ui, sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+    header { display: flex; gap: 0.5rem; align-items: center; padding: 0.6rem 0.8rem; border-bottom: 1px solid #8884; }
+    header button { font: inherit; padding: 0.35rem 0.8rem; }
+    #path { margin-left: auto; opacity: 0.7; font-size: 0.85em; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    textarea { flex: 1; width: 100%; border: 0; padding: 1rem; font: 14px ui-monospace, "SF Mono", Menlo, monospace; resize: none; outline: none; background: transparent; color: inherit; }
+    /* Minimal custom context menu. */
+    #menu { position: fixed; display: none; background: Canvas; color: CanvasText; border: 1px solid #8886; border-radius: 6px; box-shadow: 0 4px 16px #0004; padding: 0.25rem; min-width: 120px; }
+    #menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: inherit; font: inherit; padding: 0.35rem 0.6rem; border-radius: 4px; cursor: pointer; }
+    #menu button:hover { background: Highlight; color: HighlightText; }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="open">Open</button>
+    <button id="save">Save</button>
+    <span id="path">(no file)</span>
+  </header>
+  <textarea id="editor" spellcheck="false" placeholder="Open a .txt or .md file, or start typing…"></textarea>
+
+  <!-- Tiny custom context menu shown on right-click (default menu is disabled in the host). -->
+  <div id="menu"><button id="menu-save">Save</button></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

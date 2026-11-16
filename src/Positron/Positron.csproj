@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Positron</PackageId>
+    <Description>Cross-platform .NET host for HTML/JS user interfaces running in the OS-native WebView — a lightweight alternative to Electron with no bundled Chromium or Node.js.</Description>
+    <PackageTags>webview;electron;desktop;ui;html;javascript;cross-platform;wkwebview;webview2;webkitgtk</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- AOT / trim readiness: analyzers flag unsafe interop and reflection-based serialization. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- WebView2 managed Core is Windows-only. Reference it just for the Windows build so the
+       macOS/Linux assemblies carry no Windows native asset. The POSITRON_WEBVIEW2 constant
+       gates the WebView2-dependent source so the solution still builds on macOS/Linux. -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="Microsoft.Web.WebView2" />
+  </ItemGroup>
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <DefineConstants>$(DefineConstants);POSITRON_WEBVIEW2</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The JS preload bridge is embedded so it ships inside the single assembly. -->
+    <EmbeddedResource Include="Ipc\PositronBridge.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Positron.Tests" />
+    <InternalsVisibleTo Include="Positron.IntegrationTests" />
+    <InternalsVisibleTo Include="Positron.Sample.Hello" />
+  </ItemGroup>
+
+</Project>

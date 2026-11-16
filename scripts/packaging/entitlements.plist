@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for a Positron .app.
+
+  Positron publishes with NativeAOT (ahead-of-time compiled, no JIT, no runtime code
+  generation). That lets this entitlements file stay deliberately minimal: the entitlements
+  that exist specifically to let a JIT/CLR relax the hardened runtime are NOT needed and are
+  omitted on purpose. A smaller entitlement set is a smaller attack surface and sails through
+  notarization with fewer questions.
+
+  INTENTIONALLY OMITTED (do not add unless you have a concrete, documented need):
+
+    com.apple.security.cs.allow-jit
+        For runtimes that map RWX pages and JIT-compile. NativeAOT never JITs, so this is
+        unnecessary. (A plain self-contained CoreCLR build that still JITs WOULD need it —
+        but the Positron packaging targets NativeAOT.)
+
+    com.apple.security.cs.allow-unsigned-executable-memory
+        Also JIT-related; not needed for an AOT binary.
+
+    com.apple.security.cs.allow-dyld-environment-variables
+        Lets DYLD_* environment variables influence loading. Only needed for unusual
+        launch-time library injection; Positron does not require it.
+
+    com.apple.security.cs.disable-library-validation
+        Disables the requirement that all loaded libraries be signed by the same Team ID
+        (or Apple). Positron is a single self-contained apphost that only dlopen()s system
+        frameworks (WebKit.framework etc.), which are Apple-signed — so library validation
+        stays ON. Enable this ONLY if you load third-party unsigned/differently-signed
+        dylibs or plug-ins at runtime.
+
+  If you later hit a hardened-runtime denial at launch (crash with EXC_BAD_ACCESS right as a
+  dylib loads, or a notarization ticket complaint), add the single matching entitlement above
+  with a comment explaining why — do not paste the whole set.
+-->
+<plist version="1.0">
+<dict>
+</dict>
+</plist>

@@ -1,0 +1,64 @@
+site_name: Positron
+site_description: >-
+  A lightweight .NET alternative to Electron — host HTML/JS user interfaces in the
+  OS-native WebView, with a typed C#↔JavaScript IPC bridge and no bundled browser engine.
+copyright: Copyright &copy; Positron contributors — MIT licensed
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Concepts:
+      - Architecture: concepts/architecture.md
+      - IPC: concepts/ipc.md
+      - Security: concepts/security.md
+  - Tutorials:
+      - Web UI: tutorials/web-ui.md
+      - Web Components: tutorials/web-components.md
+      - Angular: tutorials/angular.md
+      - React: tutorials/react.md
+      - Text Editor: tutorials/text-editor.md
+      - Context Menu: tutorials/context-menu.md
+      - File System: tutorials/file-system.md
+  - API Reference:
+      - App: api/app.md
+      - Window: api/window.md
+      - WindowOptions: api/window-options.md
+      - File Dialogs: api/file-dialogs.md
+  - Packaging:
+      - Overview: packaging/index.md
+      - macOS: packaging/macos.md
+      - Linux: packaging/linux.md
+      - Windows: packaging/windows.md
+  - Contributing: contributing.md

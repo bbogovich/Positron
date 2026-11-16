@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Positron Web Components</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 15px -apple-system, system-ui, sans-serif; margin: 2rem; }
+    h1 { font-size: 1.3rem; }
+  </style>
+</head>
+<body>
+  <h1>Positron — custom elements, no framework</h1>
+
+  <!-- A reusable custom element. Its implementation talks to C# via window.positron.invoke. -->
+  <positron-greeter name="world"></positron-greeter>
+
+  <script>
+    // Define a <positron-greeter> custom element with Shadow DOM. On button click it invokes the
+    // C# "greet" handler and renders the reply. This is a vanilla Web Components pattern — the only
+    // Positron-specific part is the window.positron.invoke call.
+    class PositronGreeter extends HTMLElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: "open" });
+      }
+
+      connectedCallback() {
+        const name = this.getAttribute("name") || "world";
+        this.shadowRoot.innerHTML = `
+          <style>
+            :host { display: block; }
+            input, button { font: inherit; padding: 0.4rem 0.6rem; }
+            output { display: block; margin-top: 1rem; padding: 0.75rem; border: 1px solid #8884; border-radius: 6px; }
+          </style>
+          <input part="input" value="${name}" aria-label="name" />
+          <button part="button">Greet via C#</button>
+          <output>Result will appear here.</output>
+        `;
+
+        const input = this.shadowRoot.querySelector("input");
+        const output = this.shadowRoot.querySelector("output");
+        this.shadowRoot.querySelector("button").addEventListener("click", async () => {
+          try {
+            const res = await window.positron.invoke("greet", { name: input.value });
+            output.textContent = res.message;
+          } catch (e) {
+            output.textContent = "error: " + e.message;
+          }
+        });
+      }
+    }
+
+    customElements.define("positron-greeter", PositronGreeter);
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- Central Package Management: https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Library -->
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+
+    <!-- Test -->
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
+  </ItemGroup>
+</Project>

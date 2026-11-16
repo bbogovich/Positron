@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/Positron.Sample.Hello/Positron.Sample.Hello.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Positron/Positron.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Positron.IntegrationTests/Positron.IntegrationTests.csproj" />
+    <Project Path="tests/Positron.Tests/Positron.Tests.csproj" />
+  </Folder>
+</Solution>

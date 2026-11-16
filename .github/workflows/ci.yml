@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    name: Build & unit test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+
+      - name: Format check
+        run: dotnet format --verify-no-changes
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Unit tests
+        run: dotnet test -c Release --filter "Category!=E2E"
+
+  e2e-linux:
+    name: E2E (Linux / WebKitGTK under xvfb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+
+      - name: Install WebKitGTK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0 xvfb
+
+      - name: Build sample
+        run: dotnet build samples/Positron.Sample.Hello -c Release
+
+      - name: Run E2E under virtual display
+        run: xvfb-run --auto-servernum dotnet test -c Release --filter "Category=E2E"
+
+  e2e-macos:
+    name: E2E (macOS / WKWebView)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '11.0.x'
+
+      - name: Build sample
+        run: dotnet build samples/Positron.Sample.Hello -c Release
+
+      - name: Run E2E
+        run: dotnet test -c Release --filter "Category=E2E"
+
+  bridge-js:
+    name: Bridge JS tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and test
+        working-directory: tests/positron-bridge
+        run: |
+          npm ci
+          npm test

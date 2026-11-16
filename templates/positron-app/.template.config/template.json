@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Positron contributors",
+  "classifications": [ "Positron", "WebView", "Desktop", "Cross-platform" ],
+  "identity": "Positron.Templates.App",
+  "name": "Positron App",
+  "shortName": "positron-app",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "PositronApp",
+  "preferNameDirectory": true,
+  "symbols": {
+    "PositronVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "*",
+      "replaces": "POSITRON_VERSION",
+      "description": "The version of the Positron NuGet package to reference."
+    }
+  }
+}

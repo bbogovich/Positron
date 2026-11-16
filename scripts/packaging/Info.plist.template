@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Info.plist template for a Positron .app bundle.
+
+  Placeholders (__TOKEN__) are substituted by macos-bundle.sh via sed. Each token maps
+  to a variable at the top of that script:
+
+    __APP_NAME__  -> APP_NAME   (also the CFBundleExecutable: the name of the apphost
+                                 binary inside Contents/MacOS, which dotnet names after
+                                 the .csproj / AssemblyName)
+    __BUNDLE_ID__ -> BUNDLE_ID  (reverse-DNS identifier, e.g. io.github.positron.PositronApp)
+    __VERSION__   -> VERSION    (used for both the user-facing and build version)
+
+  LSMinimumSystemVersion is pinned to 11.0 (Big Sur) because Positron's WKWebView interop
+  and the universal (arm64 + x86_64) apphost target that baseline.
+-->
+<plist version="1.0">
+<dict>
+    <!-- The executable in Contents/MacOS that launchd runs. MUST match the apphost filename. -->
+    <key>CFBundleExecutable</key>
+    <string>__APP_NAME__</string>
+
+    <!-- Reverse-DNS app identity. Must be stable across releases; used by Gatekeeper,
+         notarization, TCC permission prompts, and preferences domains. -->
+    <key>CFBundleIdentifier</key>
+    <string>__BUNDLE_ID__</string>
+
+    <!-- Display name shown in Finder / the menu bar. -->
+    <key>CFBundleName</key>
+    <string>__APP_NAME__</string>
+
+    <!-- APPL marks this bundle as an application (vs. a framework/bundle). -->
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <!-- Human-readable marketing version (CFBundleShortVersionString) and the build
+         version (CFBundleVersion). Kept identical here; split them if you adopt a
+         separate build-number scheme. -->
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+
+    <!-- Draw at native Retina resolution rather than being pixel-doubled. -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- Oldest macOS this bundle supports. Matches the publish RID baseline. -->
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+</dict>
+</plist>

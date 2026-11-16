@@ -1,0 +1,13 @@
+<main style="font: 15px system-ui, sans-serif; margin: 2rem;">
+  <h1 style="font-size: 1.3rem;">Positron — Angular</h1>
+  <p>
+    <input [(ngModel)]="name" aria-label="name" style="font: inherit; padding: 0.4rem 0.6rem;" />
+    <button (click)="greet()" style="font: inherit; padding: 0.4rem 0.6rem;">Greet via C#</button>
+  </p>
+  <div style="margin-top: 1rem; padding: 0.75rem; border: 1px solid #8884; border-radius: 6px;">
+    {{ result() }}
+  </div>
+
+  <!-- Router outlet: routing is enabled so history-API fallback to index.html can be demonstrated. -->
+  <router-outlet />
+</main>

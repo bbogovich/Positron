@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metainfo for the Positron app flatpak.
+     Validate with:  flatpak run org.freedesktop.appstream-glib validate <file>
+     Spec: https://www.freedesktop.org/software/appstream/docs/ -->
+<component type="desktop-application">
+  <!-- The component id MUST match the flatpak app-id and the .desktop basename. -->
+  <id>io.github.positron.PositronApp</id>
+
+  <name>PositronApp</name>
+  <summary>HTML/JS UI hosted in the native OS WebView</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      A Positron application. Positron hosts a web UI in the operating system's native
+      WebView (WebKitGTK on Linux) with a typed C#-to-JavaScript bridge — a lightweight
+      alternative to Electron with no bundled browser engine.
+    </p>
+  </description>
+
+  <!-- Tie the metainfo to the installed .desktop file. -->
+  <launchable type="desktop-id">io.github.positron.PositronApp.desktop</launchable>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.0.0" date="2026-11-16">
+      <description>
+        <p>Initial release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

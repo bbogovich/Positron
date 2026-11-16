@@ -1,0 +1,76 @@
+# Flatpak manifest for a Positron app.
+#
+# Built with flatpak-builder / org.flatpak.Builder. See flatpak-build.sh for the invocation.
+#
+# Runtime choice — the important bit:
+#   Positron renders through libwebkit2gtk-4.1 (WebKitGTK). That library ships in the GNOME
+#   runtime (org.gnome.Platform), NOT in the freedesktop runtime. So we base on org.gnome.*
+#   and do NOT bundle WebKit ourselves — the runtime provides it. Version 49 is the GNOME
+#   runtime series that carries libwebkit2gtk-4.1.
+#
+# buildsystem: simple — we don't compile here; we take a prebuilt `dotnet publish` output and
+# lay it into /app. The publish is done by flatpak-build.sh BEFORE flatpak-builder runs; this
+# manifest's module just copies that payload in and installs the metadata.
+#
+# Docs:
+#   - Flatpak manifests:            https://docs.flatpak.org/en/latest/manifests.html
+#   - GNOME runtime:                https://docs.flatpak.org/en/latest/available-runtimes.html
+#   - Flathub submission / finish-args: https://docs.flathub.org/docs/for-app-authors/submission
+app-id: io.github.positron.PositronApp
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+
+# The launcher script installed into /app/bin (see the module below).
+command: positron-app
+
+finish-args:
+  # Rendering: prefer Wayland, fall back to X11.
+  - --socket=wayland
+  - --socket=fallback-x11
+  # WebKitGTK's multi-process model needs shared-memory / IPC between its processes.
+  - --share=ipc
+  # GPU access for hardware-accelerated compositing in the WebView.
+  - --device=dri
+  # Most web UIs load remote resources; drop this if your app is fully offline.
+  - --share=network
+  # Minimal file access for open/save dialogs. Widen only if the app needs more.
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+
+modules:
+  - name: positron-app
+    buildsystem: simple
+    build-commands:
+      # 1. Copy the self-contained publish payload into /app. publish/ is produced by
+      #    flatpak-build.sh (dotnet publish -r linux-x64 --self-contained) and referenced
+      #    as a local 'dir' source below.
+      - mkdir -p /app/positron
+      - cp -r publish/* /app/positron/
+
+      # 2. A tiny launcher on PATH. The sandbox cwd is unspecified, so exec the apphost by
+      #    absolute path. exec replaces the shell so signals reach the app directly.
+      - mkdir -p /app/bin
+      - |
+        cat > /app/bin/positron-app <<'EOF'
+        #!/bin/sh
+        exec /app/positron/PositronApp "$@"
+        EOF
+      - chmod +x /app/bin/positron-app
+
+      # 3. Desktop entry, AppStream metainfo, and icon into the standard /app/share tree.
+      - install -Dm644 io.github.positron.PositronApp.desktop        /app/share/applications/io.github.positron.PositronApp.desktop
+      - install -Dm644 io.github.positron.PositronApp.metainfo.xml   /app/share/metainfo/io.github.positron.PositronApp.metainfo.xml
+      - install -Dm644 io.github.positron.PositronApp.svg            /app/share/icons/hicolor/scalable/apps/io.github.positron.PositronApp.svg
+    sources:
+      # The dotnet publish output — a local directory populated by flatpak-build.sh.
+      - type: dir
+        path: publish
+        dest: publish
+      # Metadata files live alongside this manifest.
+      - type: file
+        path: io.github.positron.PositronApp.desktop
+      - type: file
+        path: io.github.positron.PositronApp.metainfo.xml
+      - type: file
+        path: io.github.positron.PositronApp.svg

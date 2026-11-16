@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=PositronApp
+Comment=A Positron app — HTML/JS UI in the native WebView
+# Exec matches the launcher installed into /app/bin by the flatpak manifest.
+Exec=positron-app
+Icon=io.github.positron.PositronApp
+Terminal=false
+Categories=Utility;
+# StartupWMClass should match the app's window class so the taskbar groups it correctly.
+StartupWMClass=PositronApp
