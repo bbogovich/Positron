@@ -1,0 +1,10 @@
+# Python packages needed to build the MkDocs documentation site (mkdocs.yml).
+# Install:  python3 -m pip install -r requirements.txt
+# Build:    mkdocs build --strict
+# Deploy:   mkdocs gh-deploy
+mkdocs>=1.6.1,<2
+mkdocs-material>=9.5.49,<10
+# pymdownx.* Markdown extensions (highlight, inlinehilite, details, superfences)
+pymdown-extensions>=10.0,<11
+# Syntax highlighting used by pymdownx.highlight
+Pygments>=2.16,<3
