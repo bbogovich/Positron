@@ -81,6 +81,10 @@ internal static partial class ObjC
     [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
     public static partial IntPtr SendBool(IntPtr receiver, IntPtr selector, [MarshalAs(UnmanagedType.U1)] bool arg1);
 
+    [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static partial IntPtr SendIdBool(
+        IntPtr receiver, IntPtr selector, IntPtr arg1, [MarshalAs(UnmanagedType.U1)] bool arg2);
+
     /// <summary>objc_msgSend(id, SEL, CGRect, NSUInteger, NSUInteger, bool) → id (NSWindow init).</summary>
     [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
     public static partial IntPtr SendWindowInit(
@@ -117,6 +121,11 @@ internal static partial class ObjC
     /// objc_msgSend(id, SEL, NSUInteger mask, id untilDate, id mode, bool dequeue) → id (NSEvent).
     /// Drives <c>-[NSApp nextEventMatchingMask:untilDate:inMode:dequeue:]</c> for a manual pump.
     /// </summary>
+    [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static partial IntPtr SendOtherEvent(
+        IntPtr receiver, IntPtr selector, nuint type, CGPoint location, nuint modifierFlags, double timestamp,
+        nint windowNumber, IntPtr context, short subtype, nint data1, nint data2);
+
     [LibraryImport(LibObjC, EntryPoint = "objc_msgSend")]
     public static partial IntPtr SendNextEvent(
         IntPtr receiver, IntPtr selector, nuint mask, IntPtr untilDate, IntPtr mode,
@@ -158,6 +167,18 @@ internal static partial class ObjC
         IntPtr instance = Send(Cls(className), Sel("alloc"));
         return Send(instance, Sel("init"));
     }
+}
+
+/// <summary>
+/// Mirror of Core Graphics <c>CGPoint</c> — two 64-bit doubles, blittable across
+/// <c>objc_msgSend</c>.
+/// </summary>
+[SupportedOSPlatform("macos")]
+[StructLayout(LayoutKind.Sequential)]
+internal struct CGPoint
+{
+    public double X;
+    public double Y;
 }
 
 /// <summary>

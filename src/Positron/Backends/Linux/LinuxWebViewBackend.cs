@@ -28,15 +28,29 @@ internal sealed class LinuxWebViewBackend : IWebViewBackend
     private IntPtr _webView;
     private IntPtr _contentManager;
     private ulong _signalHandlerId;
+    private int _uiThreadId;
+    private int _closedRaised;
+    private readonly TrustedOrigins _trust = new();
     private NativeCallbackContext<LinuxWebViewBackend>? _callbackContext;
 
     /// <inheritdoc />
     public event Action<string>? MessageReceived;
 
     /// <inheritdoc />
+    public event Action? Closed;
+
+    /// <inheritdoc />
     public void Initialize(WindowOptions options, string preloadScript)
     {
         gtk_init(IntPtr.Zero, IntPtr.Zero);
+        _uiThreadId = Environment.CurrentManagedThreadId;
+
+        if (options.ServeDirectory is not null)
+        {
+            // app:// serving is not yet implemented on this backend; trusting the origin keeps the
+            // bridge working once it is.
+            _trust.Trust("app://localhost/");
+        }
 
         _window = gtk_window_new(GtkWindowToplevel);
         gtk_window_set_title(_window, options.Title);
@@ -58,6 +72,11 @@ internal sealed class LinuxWebViewBackend : IWebViewBackend
             delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr, void> handler = &OnScriptMessage;
             _signalHandlerId = g_signal_connect_data(_contentManager, "script-message-received::" + MessageHandlerName,
                 (IntPtr)handler, _callbackContext.Token, IntPtr.Zero, connectFlags: 0);
+
+            // "destroy" fires however the window goes away (title-bar close, window manager,
+            // Close()); without it gtk_main() keeps running after the user closes the window.
+            delegate* unmanaged[Cdecl]<IntPtr, IntPtr, void> onDestroy = &OnWindowDestroy;
+            g_signal_connect_data(_window, "destroy", (IntPtr)onDestroy, _callbackContext.Token, IntPtr.Zero, connectFlags: 0);
         }
 
         // Inject the transport shim then the bridge at document start.
@@ -71,20 +90,39 @@ internal sealed class LinuxWebViewBackend : IWebViewBackend
     }
 
     /// <inheritdoc />
-    public void Navigate(string url) => webkit_web_view_load_uri(_webView, url);
+    public void Navigate(string url)
+    {
+        _trust.Trust(url);
+        RunOnUi(() => webkit_web_view_load_uri(_webView, url));
+    }
 
     /// <inheritdoc />
-    public void LoadHtml(string html) => webkit_web_view_load_html(_webView, html, baseUri: "about:blank");
+    public void LoadHtml(string html)
+    {
+        _trust.Trust("about:blank");
+        RunOnUi(() => webkit_web_view_load_html(_webView, html, baseUri: "about:blank"));
+    }
 
     /// <inheritdoc />
     public void Evaluate(string javaScript) =>
-        webkit_web_view_evaluate_javascript(_webView, javaScript, -1, null, null, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        RunOnUi(() => webkit_web_view_evaluate_javascript(
+            _webView, javaScript, -1, null, null, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero));
 
     /// <inheritdoc />
     public void PostMessage(string json)
     {
         string escaped = System.Text.Json.JsonSerializer.Serialize(json, LinuxJsonContext.Default.String);
-        Evaluate($"window.__positronReceive({escaped});");
+        RunOnUi(() =>
+        {
+            // Never deliver results or events to a document the host did not load.
+            if (!_trust.IsTrusted(CurrentUri()))
+            {
+                return;
+            }
+
+            webkit_web_view_evaluate_javascript(_webView, $"window.__positronReceive({escaped});", -1, null, null,
+                IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        });
     }
 
     /// <inheritdoc />
@@ -95,15 +133,120 @@ internal sealed class LinuxWebViewBackend : IWebViewBackend
     }
 
     /// <inheritdoc />
-    public void Close() => gtk_main_quit();
+    public void Close() => RunOnUi(() =>
+    {
+        // Destroying the window emits "destroy" → OnWindowDestroy raises Closed and quits gtk_main.
+        if (_window != IntPtr.Zero)
+        {
+            gtk_widget_destroy(_window);
+        }
+        else
+        {
+            gtk_main_quit();
+        }
+    });
 
     /// <inheritdoc />
     public Task<string?> ShowOpenDialogAsync(Positron.Files.OpenFileOptions options) =>
-        Task.FromResult(RunFileChooser(options.Title ?? "Open", save: false, suggestedName: null));
+        InvokeOnUiAsync(() => RunFileChooser(options.Title ?? "Open", save: false, suggestedName: null));
 
     /// <inheritdoc />
     public Task<string?> ShowSaveDialogAsync(Positron.Files.SaveFileOptions options) =>
-        Task.FromResult(RunFileChooser(options.Title ?? "Save", save: true, suggestedName: options.SuggestedFileName));
+        InvokeOnUiAsync(() => RunFileChooser(options.Title ?? "Save", save: true, suggestedName: options.SuggestedFileName));
+
+    /// <summary>The main frame's current URI, or null. GTK thread only.</summary>
+    private string? CurrentUri()
+    {
+        IntPtr uri = webkit_web_view_get_uri(_webView);
+        return uri == IntPtr.Zero ? null : Marshal.PtrToStringUTF8(uri);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> now on the GTK thread, or schedules it there with
+    /// <c>g_idle_add</c> when called from another thread. GTK and WebKitGTK are not thread-safe.
+    /// </summary>
+    private void RunOnUi(Action action)
+    {
+        if (Environment.CurrentManagedThreadId == _uiThreadId)
+        {
+            action();
+            return;
+        }
+
+        GCHandle handle = GCHandle.Alloc(action);
+        unsafe
+        {
+            g_idle_add(&OnIdle, GCHandle.ToIntPtr(handle));
+        }
+    }
+
+    private Task<T> InvokeOnUiAsync<T>(Func<T> func)
+    {
+        if (Environment.CurrentManagedThreadId == _uiThreadId)
+        {
+            return Task.FromResult(func());
+        }
+
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        RunOnUi(() =>
+        {
+            try
+            {
+                tcs.SetResult(func());
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        });
+        return tcs.Task;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static int OnIdle(IntPtr data)
+    {
+        GCHandle handle = GCHandle.FromIntPtr(data);
+        try
+        {
+            (handle.Target as Action)?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            // An exception escaping a native callback terminates the process; report it instead.
+            Console.Error.WriteLine($"positron: UI-thread callback failed: {ex}");
+        }
+        finally
+        {
+            handle.Free();
+        }
+
+        return 0; // G_SOURCE_REMOVE: run once.
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void OnWindowDestroy(IntPtr widget, IntPtr userData)
+    {
+        LinuxWebViewBackend? backend = NativeCallbackContext<LinuxWebViewBackend>.Resolve(userData);
+        if (backend is null)
+        {
+            return;
+        }
+
+        backend._window = IntPtr.Zero; // destroyed: must not be touched again
+        if (Interlocked.Exchange(ref backend._closedRaised, 1) == 0)
+        {
+            try
+            {
+                backend.Closed?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"positron: Closed handler threw: {ex}");
+            }
+        }
+
+        gtk_main_quit();
+    }
 
     // GtkFileChooserNative action: 0 = open, 1 = save. Response ACCEPT = -3.
     private string? RunFileChooser(string title, bool save, string? suggestedName)
@@ -143,7 +286,8 @@ internal sealed class LinuxWebViewBackend : IWebViewBackend
 
     private static void AddUserScript(IntPtr manager, string source)
     {
-        IntPtr script = webkit_user_script_new(source, WebKitUserContentInjectAllFrames,
+        // Top frame only (parity with macOS): iframes do not get the bridge.
+        IntPtr script = webkit_user_script_new(source, WebKitUserContentInjectTopFrame,
             WebKitUserScriptInjectAtDocumentStart, IntPtr.Zero, IntPtr.Zero);
         webkit_user_content_manager_add_script(manager, script);
     }
@@ -159,6 +303,13 @@ internal sealed class LinuxWebViewBackend : IWebViewBackend
     {
         LinuxWebViewBackend? backend = NativeCallbackContext<LinuxWebViewBackend>.Resolve(userData);
         if (backend is null)
+        {
+            return;
+        }
+
+        // Only documents the host loaded may use the bridge. This signal carries no frame info in
+        // webkit2gtk-4.1, so the check is on the main frame's URI.
+        if (!backend._trust.IsTrusted(backend.CurrentUri()))
         {
             return;
         }

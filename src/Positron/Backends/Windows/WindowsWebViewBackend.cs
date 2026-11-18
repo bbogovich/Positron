@@ -29,6 +29,9 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
 #pragma warning disable CS0067
     /// <inheritdoc />
     public event Action<string>? MessageReceived;
+
+    /// <inheritdoc />
+    public event Action? Closed;
 #pragma warning restore CS0067
 
 #if POSITRON_WEBVIEW2
@@ -43,6 +46,10 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
     private string? _pendingHtml;
     private string? _pendingUrl;
     private readonly Queue<string> _pendingEval = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _uiQueue = new();
+    private readonly TrustedOrigins _trust = new();
+    private int _uiThreadId;
+    private int _closedRaised;
 
     // Keep the WndProc delegate alive for the window's lifetime.
     private Win32WndProc? _wndProc;
@@ -53,6 +60,14 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
     {
         _pendingPreload = preloadScript;
         _options = options;
+        _uiThreadId = Environment.CurrentManagedThreadId;
+
+        if (options.ServeDirectory is not null)
+        {
+            // The served folder is mapped to a virtual host; trust both spellings of its origin.
+            _trust.Trust("app://localhost/");
+            _trust.Trust("https://localhost/");
+        }
         IntPtr hInstance = Win32.GetModuleHandle(IntPtr.Zero);
         _wndProc = WndProc;
 
@@ -95,7 +110,15 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
         await _webView.AddScriptToExecuteOnDocumentCreatedAsync(shim);
         await _webView.AddScriptToExecuteOnDocumentCreatedAsync(_pendingPreload);
 
-        _webView.WebMessageReceived += (_, e) => MessageReceived?.Invoke(e.TryGetWebMessageAsString());
+        // WebMessageReceived on CoreWebView2 fires only for the top-level document; e.Source is that
+        // document's URI. Drop messages from any origin the host did not load.
+        _webView.WebMessageReceived += (_, e) =>
+        {
+            if (_trust.IsTrusted(e.Source))
+            {
+                MessageReceived?.Invoke(e.TryGetWebMessageAsString());
+            }
+        };
 
         // Settings: dev tools and context menu (WebView2 exposes these as settings rather than a
         // native delegate). app:// serving maps to a virtual host backed by the served folder.
@@ -131,29 +154,39 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
     /// <inheritdoc />
     public void Navigate(string url)
     {
-        if (_webView is null)
+        _trust.Trust(url);
+        RunOnUi(() =>
         {
-            _pendingUrl = url;
-            return;
-        }
+            if (_webView is null)
+            {
+                _pendingUrl = url;
+                return;
+            }
 
-        _webView.Navigate(url);
+            _webView.Navigate(url);
+        });
     }
 
     /// <inheritdoc />
     public void LoadHtml(string html)
     {
-        if (_webView is null)
+        _trust.Trust("about:blank");
+        RunOnUi(() =>
         {
-            _pendingHtml = html;
-            return;
-        }
+            if (_webView is null)
+            {
+                _pendingHtml = html;
+                return;
+            }
 
-        _webView.NavigateToString(html);
+            _webView.NavigateToString(html);
+        });
     }
 
     /// <inheritdoc />
-    public void Evaluate(string javaScript)
+    public void Evaluate(string javaScript) => RunOnUi(() => EvaluateOnUi(javaScript));
+
+    private void EvaluateOnUi(string javaScript)
     {
         if (_webView is null)
         {
@@ -169,7 +202,17 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
     public void PostMessage(string json)
     {
         string escaped = System.Text.Json.JsonSerializer.Serialize(json, WindowsJsonContext.Default.String);
-        Evaluate($"window.__positronReceive({escaped});");
+        RunOnUi(() =>
+        {
+            // Never deliver results or events to a document the host did not load. (Before the
+            // WebView exists the frame is queued and flushed after the host's own first navigation.)
+            if (_webView is not null && !_trust.IsTrusted(_webView.Source))
+            {
+                return;
+            }
+
+            EvaluateOnUi($"window.__positronReceive({escaped});");
+        });
     }
 
     /// <inheritdoc />
@@ -184,11 +227,44 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
     }
 
     /// <inheritdoc />
-    public void Close()
+    public void Close() => RunOnUi(() =>
     {
+        // DestroyWindow must run on the window's own thread; WM_DESTROY then raises Closed and quits.
         if (_hwnd != IntPtr.Zero)
         {
             Win32.DestroyWindow(_hwnd);
+        }
+    });
+
+    /// <summary>
+    /// Runs <paramref name="action"/> now on the UI thread, or queues it and wakes the message loop
+    /// with a private window message. WebView2 objects may only be used from the thread that created
+    /// them (calls from others throw), and async handlers and timers run on the thread pool.
+    /// </summary>
+    private void RunOnUi(Action action)
+    {
+        if (Environment.CurrentManagedThreadId == _uiThreadId)
+        {
+            action();
+            return;
+        }
+
+        _uiQueue.Enqueue(action);
+        Win32.PostMessage(_hwnd, Win32.WmPositronInvoke, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private void DrainUiQueue()
+    {
+        while (_uiQueue.TryDequeue(out Action? action))
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"positron: UI-thread callback failed: {ex}");
+            }
         }
     }
 
@@ -230,7 +306,23 @@ internal sealed class WindowsWebViewBackend : IWebViewBackend
             case Win32.WmSize:
                 ResizeToClient();
                 return IntPtr.Zero;
+            case Win32.WmPositronInvoke:
+                DrainUiQueue();
+                return IntPtr.Zero;
             case Win32.WmDestroy:
+                _hwnd = IntPtr.Zero;
+                if (Interlocked.Exchange(ref _closedRaised, 1) == 0)
+                {
+                    try
+                    {
+                        Closed?.Invoke();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"positron: Closed handler threw: {ex}");
+                    }
+                }
+
                 Win32.PostQuitMessage(0);
                 return IntPtr.Zero;
             default:

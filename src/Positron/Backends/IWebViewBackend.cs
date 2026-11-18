@@ -11,11 +11,25 @@ namespace Positron.Backends;
 /// </summary>
 /// <remarks>
 /// A backend both hosts the window and acts as the <see cref="IMessageTransport"/> for the IPC
-/// router — it owns the native message bridge in both directions. All members are expected to be
-/// called on the UI thread established by <see cref="Run"/>.
+/// router — it owns the native message bridge in both directions.
+/// <para>
+/// <b>Threading.</b> <see cref="Initialize"/> and <see cref="Run"/> are called on the UI (main)
+/// thread. Every other member may be called from any thread — async handler continuations and
+/// timers run on the thread pool — and the backend marshals the native work onto the UI thread.
+/// </para>
+/// <para>
+/// <b>Trust.</b> A backend delivers inbound messages only from, and posts outbound messages only to,
+/// a main-frame document whose origin the host loaded (see <see cref="TrustedOrigins"/>).
+/// </para>
 /// </remarks>
 internal interface IWebViewBackend : IMessageTransport, IDisposable
 {
+    /// <summary>
+    /// Raised once, on the UI thread, when the native window closes — whether the user closed it or
+    /// <see cref="Close"/> was called. The run loop exits after it, so <see cref="Run"/> returns.
+    /// </summary>
+    event Action? Closed;
+
     /// <summary>
     /// Creates the native window and WebView, injects the preload bridge script at document
     /// start, and wires the native message handler. Must be called before <see cref="Run"/>.

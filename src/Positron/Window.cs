@@ -17,13 +17,25 @@ public sealed class Window
     {
         _backend = backend;
         _router = router;
+        _backend.Closed += () => Closed?.Invoke();
     }
 
     /// <summary>
-    /// Raised after the window's native run loop has been asked to exit via <see cref="Close"/>.
-    /// Use it to release app resources (timers, file handles) tied to the window's lifetime.
+    /// Raised once, on the UI thread, when the window closes — whether the user closed it (title-bar
+    /// close button, window-manager close) or <see cref="Close"/> was called.
+    /// <see cref="App.Run(WindowOptions, Action{Window}, System.Text.Json.JsonSerializerOptions)"/>
+    /// returns after it. Use it to release app resources (timers, file handles) tied to the window.
     /// </summary>
     public event Action? Closed;
+
+    /// <summary>
+    /// Raised when a C# handler throws — including when the JavaScript payload could not be
+    /// deserialized into the handler's argument type. Arguments are the channel name and the
+    /// exception. The web content only ever receives a generic rejection, so this is the place to
+    /// log the real failure. If nothing is subscribed, the failure is written to standard error.
+    /// </summary>
+    /// <remarks>Raised on the thread the handler faulted on (often a thread-pool thread).</remarks>
+    public event Action<string, Exception>? HandlerError;
 
     /// <summary>Navigates the web content to a URL (e.g. a <c>file://</c> or <c>http://</c> address).</summary>
     public void LoadUrl(string url)
@@ -63,12 +75,32 @@ public sealed class Window
     /// <summary>
     /// Closes the window and exits the native run loop, unblocking
     /// <see cref="App.Run(WindowOptions, Action{Window}, System.Text.Json.JsonSerializerOptions)"/>.
-    /// Raises <see cref="Closed"/>. Safe to call from a handler or any thread.
+    /// <see cref="Closed"/> is raised once the native window has closed. Safe to call from a handler
+    /// or any thread.
     /// </summary>
-    public void Close()
+    public void Close() => _backend.Close();
+
+    /// <summary>
+    /// Routes a handler failure to <see cref="HandlerError"/> subscribers, or to standard error when
+    /// there are none. Never throws: a faulty subscriber must not break IPC dispatch.
+    /// </summary>
+    internal void ReportHandlerError(string channel, Exception exception)
     {
-        _backend.Close();
-        Closed?.Invoke();
+        Action<string, Exception>? subscribers = HandlerError;
+        if (subscribers is null)
+        {
+            Console.Error.WriteLine($"positron: handler for channel '{channel}' failed: {exception}");
+            return;
+        }
+
+        try
+        {
+            subscribers(channel, exception);
+        }
+        catch (Exception subscriberFault)
+        {
+            Console.Error.WriteLine($"positron: HandlerError subscriber threw: {subscriberFault}");
+        }
     }
 
     /// <summary>

@@ -72,8 +72,12 @@ internal static partial class WebKitGtkInterop
     [LibraryImport(Gtk)]
     public static partial void gtk_main_quit();
 
+    [LibraryImport(Gtk)]
+    public static partial void gtk_widget_destroy(IntPtr widget);
+
     // ── WebKitGTK ───────────────────────────────────────────────────────────────────────────
     public const int WebKitUserContentInjectAllFrames = 0;
+    public const int WebKitUserContentInjectTopFrame = 1;
     public const int WebKitUserScriptInjectAtDocumentStart = 0;
 
     [LibraryImport(WebKit)]
@@ -81,6 +85,10 @@ internal static partial class WebKitGtkInterop
 
     [LibraryImport(WebKit)]
     public static partial IntPtr webkit_web_view_get_user_content_manager(IntPtr webView);
+
+    /// <summary>The main frame's current URI. The returned string is owned by the web view — do not free.</summary>
+    [LibraryImport(WebKit)]
+    public static partial IntPtr webkit_web_view_get_uri(IntPtr webView);
 
     [LibraryImport(WebKit, StringMarshalling = StringMarshalling.Utf8)]
     public static partial void webkit_web_view_load_uri(IntPtr webView, string uri);
@@ -119,6 +127,11 @@ internal static partial class WebKitGtkInterop
 
     [LibraryImport(GObject)]
     public static partial void g_signal_handler_disconnect(IntPtr instance, ulong handlerId);
+
+    // ── GLib main loop ──────────────────────────────────────────────────────────────────────
+    /// <summary>Schedules <paramref name="function"/> on the default main context (the GTK thread).</summary>
+    [LibraryImport(GLib)]
+    public static unsafe partial uint g_idle_add(delegate* unmanaged[Cdecl]<IntPtr, int> function, IntPtr data);
 
     // ── GLib memory ─────────────────────────────────────────────────────────────────────────
     [LibraryImport(GLib)]

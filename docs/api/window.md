@@ -18,6 +18,10 @@ public void LoadUrl(string url)
 Navigates the web content to a URL — e.g. a `file://` or `http://` address, or `app://localhost/`
 when [`WindowOptions.ServeDirectory`](window-options.md) is set. Throws if `url` is null or empty.
 
+Loading a URL also **trusts its origin**: only documents from origins the host loaded (through
+`LoadUrl`, `LoadHtml`, or `ServeDirectory`) can use the IPC bridge. See
+[Security](../concepts/security.md#only-documents-you-loaded-can-use-the-bridge).
+
 ```csharp
 window.LoadUrl(new Uri(Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html")).AbsoluteUri);
 ```
@@ -91,8 +95,9 @@ window.Emit("tick", new Tick(DateTimeOffset.Now.ToString("HH:mm:ss")));
 public void Close()
 ```
 
-Closes the window and exits the native run loop, unblocking [`App.Run`](app.md). Raises
-[`Closed`](#closed). Safe to call from a handler or any thread.
+Closes the window and exits the native run loop, unblocking [`App.Run`](app.md).
+[`Closed`](#closed) is raised once the native window has closed. Safe to call from a handler or
+any thread.
 
 ### `Closed`
 
@@ -100,13 +105,39 @@ Closes the window and exits the native run loop, unblocking [`App.Run`](app.md).
 public event Action? Closed
 ```
 
-Raised after the window's native run loop has been asked to exit via `Close`. Use it to release
-app resources (timers, file handles) tied to the window's lifetime.
+Raised once, on the UI thread, when the window closes — whether the user closed it (title-bar
+close button, Cmd-W, the window manager) or `Close` was called. `App.Run` returns right after.
+Use it to release app resources (timers, file handles) tied to the window's lifetime.
 
 ```csharp
 var timer = new Timer(_ => window.Emit("tick", DateTime.Now), null, 0, 1000);
 window.Closed += () => timer.Dispose();
 ```
+
+## Errors
+
+### `HandlerError`
+
+```csharp
+public event Action<string, Exception>? HandlerError
+```
+
+Raised when a C# handler throws — including when the JavaScript payload cannot be deserialized
+into the handler's argument type. The arguments are the channel name and the exception. The page
+only ever receives a generic rejection, so this is where the real failure should be logged. If
+nothing is subscribed, the failure is written to standard error. Raised on the thread the handler
+faulted on, often a thread-pool thread.
+
+```csharp
+window.HandlerError += (channel, ex) => logger.LogError(ex, "IPC handler {Channel} failed", channel);
+```
+
+## Threading
+
+`App.Run` and the `configure` callback run on the main (UI) thread. Every other `Window` member —
+`LoadUrl`, `LoadHtml`, `Emit`, `Close`, the file dialogs — may be called from any thread (async
+handler continuations and timers run on the thread pool); Positron marshals the native work onto
+the UI thread.
 
 ## Native file dialogs
 

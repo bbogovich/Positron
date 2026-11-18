@@ -27,6 +27,17 @@ public sealed class MacWebViewE2ETests
         RunSelfTest("--selftest-serve");
     }
 
+    [SkippableTheory]
+    [InlineData("--selftest-close-user")]  // close button: Closed raised, App.Run returns
+    [InlineData("--selftest-close-api")]   // Window.Close() from a pool thread: same
+    [InlineData("--selftest-thread")]      // Emit / async results from pool threads reach the page
+    [InlineData("--selftest-origin")]      // iframes and untrusted origins cannot reach handlers
+    public void SelfTest_LifecycleThreadingAndTrust_ExitsZero(string mode)
+    {
+        Skip.IfNot(OperatingSystem.IsMacOS(), "macOS WKWebView backend only runs on macOS.");
+        RunSelfTest(mode);
+    }
+
     private static void RunSelfTest(string mode)
     {
         string dll = LocateSampleDll();

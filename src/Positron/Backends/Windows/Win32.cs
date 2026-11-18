@@ -16,6 +16,9 @@ internal static partial class Win32
     public const uint WmDestroy = 0x0002;
     public const uint WmSize = 0x0005;
 
+    /// <summary>Private message used to run queued work on the UI thread (WM_APP + 1).</summary>
+    public const uint WmPositronInvoke = 0x8001;
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct Msg
     {
@@ -87,6 +90,10 @@ internal static partial class Win32
 
     [LibraryImport("user32.dll")]
     public static partial void PostQuitMessage(int exitCode);
+
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

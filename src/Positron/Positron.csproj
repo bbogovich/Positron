@@ -20,10 +20,13 @@
   <!-- WebView2 managed Core is Windows-only. Reference it just for the Windows build so the
        macOS/Linux assemblies carry no Windows native asset. The POSITRON_WEBVIEW2 constant
        gates the WebView2-dependent source so the solution still builds on macOS/Linux. -->
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <!-- PositronForceWebView2=true compiles the Windows backend on any host, as a compile check only:
+       dotnet build src/Positron -p:PositronForceWebView2=true -p:TreatWarningsAsErrors=false
+       (off Windows the package's WPF assembly raises an MSB3277 WindowsBase conflict warning). -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) Or '$(PositronForceWebView2)' == 'true'">
     <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
-  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) Or '$(PositronForceWebView2)' == 'true'">
     <DefineConstants>$(DefineConstants);POSITRON_WEBVIEW2</DefineConstants>
   </PropertyGroup>
 

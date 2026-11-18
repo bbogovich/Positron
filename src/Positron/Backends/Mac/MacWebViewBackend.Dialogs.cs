@@ -8,9 +8,10 @@ namespace Positron.Backends.Mac;
 
 /// <summary>
 /// macOS native file-dialog support for <see cref="MacWebViewBackend"/>, using <c>NSOpenPanel</c>
-/// and <c>NSSavePanel</c> run modally on the main thread. Because <c>App.Run</c> owns the main
-/// thread and IPC handlers are invoked on it, the modal call completes synchronously and is wrapped
-/// in a completed <see cref="Task{TResult}"/>.
+/// and <c>NSSavePanel</c> run modally on the main thread. Called on the main thread (the built-in
+/// dialog channels are dispatched there), the modal call completes synchronously; called from any
+/// other thread, it is marshalled to the main queue and the returned task completes when the user
+/// dismisses the panel.
 /// </summary>
 [SupportedOSPlatform("macos")]
 internal sealed partial class MacWebViewBackend
@@ -18,7 +19,14 @@ internal sealed partial class MacWebViewBackend
     private const nint NSModalResponseOK = 1;
 
     /// <inheritdoc />
-    public Task<string?> ShowOpenDialogAsync(OpenFileOptions options)
+    public Task<string?> ShowOpenDialogAsync(OpenFileOptions options) =>
+        AppKit.InvokeOnMainAsync(() => RunOpenPanel(options));
+
+    /// <inheritdoc />
+    public Task<string?> ShowSaveDialogAsync(SaveFileOptions options) =>
+        AppKit.InvokeOnMainAsync(() => RunSavePanel(options));
+
+    private static string? RunOpenPanel(OpenFileOptions options)
     {
         IntPtr panel = Send(Cls("NSOpenPanel"), Sel("openPanel"));
         Send(panel, Sel("setCanChooseFiles:"), (IntPtr)1);
@@ -30,21 +38,20 @@ internal sealed partial class MacWebViewBackend
         nint response = (nint)Send(panel, Sel("runModal"));
         if (response != NSModalResponseOK)
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
 
         IntPtr urls = Send(panel, Sel("URLs"));
         if (urls == IntPtr.Zero || (nint)Send(urls, Sel("count")) == 0)
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
 
         IntPtr url = SendIndex(urls, Sel("objectAtIndex:"), 0);
-        return Task.FromResult(PathFromUrl(url));
+        return PathFromUrl(url);
     }
 
-    /// <inheritdoc />
-    public Task<string?> ShowSaveDialogAsync(SaveFileOptions options)
+    private static string? RunSavePanel(SaveFileOptions options)
     {
         IntPtr panel = Send(Cls("NSSavePanel"), Sel("savePanel"));
 
@@ -58,11 +65,11 @@ internal sealed partial class MacWebViewBackend
         nint response = (nint)Send(panel, Sel("runModal"));
         if (response != NSModalResponseOK)
         {
-            return Task.FromResult<string?>(null);
+            return null;
         }
 
         IntPtr url = Send(panel, Sel("URL"));
-        return Task.FromResult(PathFromUrl(url));
+        return PathFromUrl(url);
     }
 
     private static void ConfigureCommon(IntPtr panel, string? title, string? initialDir, IReadOnlyList<string>? extensions)

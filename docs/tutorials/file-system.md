@@ -90,8 +90,9 @@ Remember to add `ReadRequest` (and any result types) to your `[JsonSerializable]
   host-implemented `window.positron.fs` surface — exactly the point of the
   [contextBridge-style model](../concepts/security.md).
 - **Handler exceptions don't leak.** If your handler throws (e.g. `FileNotFoundException`), the
-  renderer gets a generic rejection; the real exception is surfaced host-side for logging, not sent
-  to the page.
+  renderer gets a generic rejection; the real exception is raised on
+  [`Window.HandlerError`](../api/window.md#handlererror) for logging (or written to standard error
+  when nothing subscribes), not sent to the page.
 
 ## Next steps
 

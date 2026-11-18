@@ -19,6 +19,14 @@ if (args.Contains("--selftest-serve"))
     return SelfTest.Run("serve");
 }
 
+foreach (string mode in new[] { "close-user", "close-api", "thread", "origin" })
+{
+    if (args.Contains("--selftest-" + mode))
+    {
+        return SelfTest.Run(mode);
+    }
+}
+
 if (args.Contains("--selftest"))
 {
     return SelfTest.Run();

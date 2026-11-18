@@ -41,3 +41,13 @@ dotnet test --filter "Category=E2E"   # macOS directly; Linux via `xvfb-run`
 
 Positron selects a backend at runtime. If you add support or fix a bug on a platform you can't
 test locally, say so in the PR so a maintainer on that platform can verify.
+
+The Windows (WebView2) backend compiles only on a Windows host by default. To compile-check it
+from macOS or Linux:
+
+```bash
+dotnet build src/Positron -p:PositronForceWebView2=true -p:TreatWarningsAsErrors=false
+```
+
+(Off Windows the WebView2 package's WPF assembly raises an MSB3277 `WindowsBase` warning, hence
+`TreatWarningsAsErrors=false`; the build is a compile check only.)

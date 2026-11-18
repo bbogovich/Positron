@@ -11,6 +11,14 @@ internal sealed class FakeWebViewBackend : IWebViewBackend
 {
     public event Action<string>? MessageReceived;
 
+    public event Action? ClosedEvent;
+
+    event Action? IWebViewBackend.Closed
+    {
+        add => ClosedEvent += value;
+        remove => ClosedEvent -= value;
+    }
+
     public string? NavigatedUrl { get; private set; }
     public string? LoadedHtml { get; private set; }
     public List<string> Evaluated { get; } = new();
@@ -33,7 +41,15 @@ internal sealed class FakeWebViewBackend : IWebViewBackend
 
     public void Run() => Ran = true;
 
-    public void Close() => Closed = true;
+    public void Close()
+    {
+        // Mirror a native backend: closing the window raises Closed once.
+        if (!Closed)
+        {
+            Closed = true;
+            ClosedEvent?.Invoke();
+        }
+    }
 
     /// <summary>Canned path returned by the next open/save dialog call (null = cancelled).</summary>
     public string? NextDialogResult { get; set; }

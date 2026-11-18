@@ -42,6 +42,16 @@ public static class App
         ArgumentNullException.ThrowIfNull(serializerOptions);
 
         using IWebViewBackend backend = BackendFactory.Create();
+        RunWith(backend, options, configure, serializerOptions);
+    }
+
+    /// <summary>
+    /// The body of <see cref="Run"/> against an explicit backend, so the host wiring can be tested
+    /// with a fake backend. The caller owns (and disposes) <paramref name="backend"/>.
+    /// </summary>
+    internal static void RunWith(
+        IWebViewBackend backend, WindowOptions options, Action<Window> configure, JsonSerializerOptions serializerOptions)
+    {
         string preload = BuildPreload(options.Preload);
         backend.Initialize(options, preload);
 
@@ -54,8 +64,12 @@ public static class App
                 PositronBuiltinsContext.Default),
         };
 
-        using var router = new IpcRouter(backend, combined);
-        var window = new Window(backend, router);
+        // The router reports handler faults through the window, which is created just below; no
+        // message can arrive before the run loop starts, so the window is always set by then.
+        Window? window = null;
+        using var router = new IpcRouter(backend, combined,
+            onHandlerError: (channel, exception) => window?.ReportHandlerError(channel, exception));
+        window = new Window(backend, router);
         window.RegisterBuiltins(backend);
 
         configure(window);
